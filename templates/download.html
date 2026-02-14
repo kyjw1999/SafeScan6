@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ direction }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ ui.download_title }}</title>
+    <meta name="theme-color" content="#070914">
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
+    <link rel="icon" href="{{ url_for('static', filename='icons/icon-192.png') }}" type="image/png">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="orb orb-a" aria-hidden="true"></div>
+<div class="orb orb-b" aria-hidden="true"></div>
+<div class="orb orb-c" aria-hidden="true"></div>
+
+<div class="app-shell">
+    <header class="app-header">
+        <a class="brand" href="{{ url_for('home', lang=lang) }}">
+            <span class="brand-mark" aria-hidden="true">SS</span>
+            <span class="brand-stack">
+                <span class="brand-name">{{ ui.brand }}</span>
+                <span class="brand-tag">{{ ui.tagline }}</span>
+            </span>
+        </a>
+
+        <div class="header-actions">
+            <button class="install-btn" id="installApp" type="button" hidden>{{ ui.install }}</button>
+            <a class="lang-toggle" href="{{ url_for('download_page', lang=toggle_lang) }}">{{ ui.toggle }}</a>
+        </div>
+    </header>
+
+    <main class="main-grid">
+        <section class="hero reveal">
+            <h1 class="hero-title"><span>{{ ui.download_title }}</span></h1>
+            <p class="hero-text">{{ ui.download_text }}</p>
+
+            <div class="badges" aria-label="Options">
+                <span class="badge">{{ ui.install }}</span>
+                <span class="badge">{{ ui.download_apk }}</span>
+            </div>
+
+            <p class="hero-text">{{ ui.download_install_hint }}</p>
+
+            <div class="example">
+                <a class="lang-toggle" href="{{ url_for('home', lang=lang) }}">{{ ui.back_to_scan }}</a>
+            </div>
+        </section>
+
+        <section class="scan reveal">
+            <div class="scan-card">
+                <div class="scan-head">
+                    <h2 class="scan-title">{{ ui.download_apk }}</h2>
+                    <p class="scan-subtitle">{{ ui.apk_note }}</p>
+                </div>
+
+                {% if apk_available %}
+                <a class="primary-btn" href="{{ url_for('download_android', lang=lang) }}">{{ ui.download_apk }}</a>
+                {% else %}
+                <div class="primary-btn disabled" role="note">{{ ui.apk_missing }}</div>
+                {% endif %}
+
+                <p class="privacy">{{ ui.download_install_hint }}</p>
+            </div>
+        </section>
+    </main>
+
+    <footer class="app-footer">
+        {{ ui.footer }}
+    </footer>
+</div>
+
+<script>
+    (function () {
+        if (!("serviceWorker" in navigator)) return;
+
+        // Avoid reloading on first install; reload only when an update takes over.
+        var hadController = !!navigator.serviceWorker.controller;
+
+        window.addEventListener("load", function () {
+            navigator.serviceWorker
+                .register("{{ url_for('service_worker') }}", { scope: "/" })
+                .then(function (reg) {
+                    try { reg.update(); } catch (e) { }
+                })
+                .catch(function () { });
+        });
+
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+            if (!hadController) {
+                hadController = true;
+                return;
+            }
+            if (window.__swReloading) return;
+            window.__swReloading = true;
+            window.location.reload();
+        });
+    })();
+</script>
+
+<script>
+    (function () {
+        var installBtn = document.getElementById('installApp');
+        if (!installBtn) return;
+
+        var deferredPrompt = null;
+
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            installBtn.hidden = false;
+        });
+
+        window.addEventListener('appinstalled', function () {
+            deferredPrompt = null;
+            installBtn.hidden = true;
+        });
+
+        installBtn.addEventListener('click', function () {
+            if (!deferredPrompt) return;
+            installBtn.disabled = true;
+            deferredPrompt.prompt();
+
+            deferredPrompt.userChoice
+                .then(function () {
+                    deferredPrompt = null;
+                    installBtn.hidden = true;
+                })
+                .catch(function () {
+                    deferredPrompt = null;
+                })
+                .then(function () {
+                    installBtn.disabled = false;
+                });
+        });
+    })();
+</script>
+
+</body>
+</html>

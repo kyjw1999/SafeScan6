@@ -1,0 +1,64 @@
+  name: Deploy Offline PWA to GitHub Pages
+
+  on:
+    push:
+      branches: ["main"]
+    workflow_dispatch:
+
+  permissions:
+    contents: read
+    pages: write
+    id-token: write
+
+  concurrency:
+    group: "pages"
+    cancel-in-progress: true
+
+  jobs:
+    deploy:
+      runs-on: ubuntu-latest
+      environment:
+        name: github-pages
+        url: ${{ steps.deployment.outputs.page_url }}
+      steps:
+        - name: Checkout
+          uses: actions/checkout@v4
+
+        - name: Build Pages folder
+          run: |
+            set -euo pipefail
+            rm -rf dist
+            mkdir -p dist
+            cp -R offline/. dist/
+            # Avoid Jekyll interfering with PWA asset extensions.
+            touch dist/.nojekyll
+
+            # Optional: ship APK alongside the PWA (download from /downloads/*).
+            # Use one canonical APK and mirror the legacy filename for compatibility.
+            mkdir -p dist/downloads
+            APK_SOURCE=""
+            if [ -f "static/downloads/SafeScan.apk" ]; then
+              APK_SOURCE="static/downloads/SafeScan.apk"
+            elif [ -f "static/downloads/SafeScanOffline.apk" ]; then
+              APK_SOURCE="static/downloads/SafeScanOffline.apk"
+            fi
+
+            if [ -n "$APK_SOURCE" ]; then
+              cp "$APK_SOURCE" "dist/downloads/SafeScan.apk"
+              cp "$APK_SOURCE" "dist/downloads/SafeScanOffline.apk"
+            fi
+
+            # Cache-bust APK link on each deploy to avoid stale browser downloads.
+            if [ -f "dist/index.html" ]; then
+              sed -i "s|downloads/SafeScan.apk|downloads/SafeScan.apk?v=${GITHUB_SHA}|g" dist/index.html
+              sed -i "s|downloads/SafeScanOffline.apk|downloads/SafeScan.apk?v=${GITHUB_SHA}|g" dist/index.html
+            fi
+
+        - name: Upload Pages artifact
+          uses: actions/upload-pages-artifact@v3
+          with:
+            path: dist
+
+        - name: Deploy to GitHub Pages
+          id: deployment
+          uses: actions/deploy-pages@v4
